@@ -2,6 +2,7 @@ from gql import gql, Client
 from gql.transport.aiohttp import AIOHTTPTransport
 from datetime import datetime
 import logging
+from gql.transport.requests import RequestsHTTPTransport
 
 # Configure logging to append to /tmp/crm_heartbeat_log.txt
 logging.basicConfig(
