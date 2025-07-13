@@ -1,29 +1,33 @@
-# File: crm/schema.py
-# This file defines the GraphQL schema for the CRM application, including types, inputs, and
 import graphene
 from graphene_django import DjangoObjectType
+from graphene_django.filter import DjangoFilterConnectionField
 from django.db import transaction, IntegrityError
 from .models import Customer, Product, Order
+from .filters import CustomerFilter, ProductFilter, OrderFilter
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 from datetime import datetime
 
-
-class CustomerType(graphene.ObjectType):
-    id = graphene.ID()
-    name = graphene.String()
-    email = graphene.String()
-    phone = graphene.String()
+class CustomerType(DjangoObjectType):
+    class Meta:
+        model = Customer
+        fields = ('id', 'name', 'email', 'phone', 'created_at')
+        filterset_class = CustomerFilter
+        interfaces = (graphene.relay.Node,)
 
 class ProductType(DjangoObjectType):
     class Meta:
         model = Product
         fields = ('id', 'name', 'price', 'stock')
+        filterset_class = ProductFilter
+        interfaces = (graphene.relay.Node,)
 
 class OrderType(DjangoObjectType):
     class Meta:
         model = Order
         fields = ('id', 'customer', 'products', 'order_date', 'total_amount')
+        filterset_class = OrderFilter
+        interfaces = (graphene.relay.Node,)
 
 class CustomerInput(graphene.InputObjectType):
     name = graphene.String(required=True)
@@ -44,13 +48,32 @@ class OrderInput(graphene.InputObjectType):
     order_date = graphene.DateTime(required=False)
 
 class ErrorType(graphene.ObjectType):
-    index = graphene.Int()
-    message = graphene.String()
+    index = graphene.Int(required=False)
+    message = graphene.String(required=False)
 
-    def __init__(self, index=None, message=None, **kwargs):
-        super().__init__(**kwargs)
-        self.index = index
-        self.message = message
+class CustomerFilterInput(graphene.InputObjectType):
+    name = graphene.String()
+    email = graphene.String()
+    created_at__gte = graphene.DateTime()
+    created_at__lte = graphene.DateTime()
+    phone_pattern = graphene.String()
+
+class ProductFilterInput(graphene.InputObjectType):
+    name = graphene.String()
+    price__gte = graphene.Decimal()
+    price__lte = graphene.Decimal()
+    stock__gte = graphene.Int()
+    stock__lte = graphene.Int()
+    low_stock = graphene.Boolean()
+
+class OrderFilterInput(graphene.InputObjectType):
+    total_amount__gte = graphene.Decimal()
+    total_amount__lte = graphene.Decimal()
+    order_date__gte = graphene.DateTime()
+    order_date__lte = graphene.DateTime()
+    customer_name = graphene.String()
+    product_name = graphene.String()
+    product_id = graphene.ID()
 
 class CreateCustomer(graphene.Mutation):
     class Arguments:
@@ -97,7 +120,7 @@ class BulkCreateCustomers(graphene.Mutation):
                 customer.save()
                 customers.append(customer)
             except (ValidationError, IntegrityError) as e:
-                errors.append(ErrorType(index=index, message=str(e)))
+                errors.append(ErrorType(index=index, message=str(e))) # type: ignore
         
         return BulkCreateCustomers(customers=customers, errors=errors) # type: ignore
 
@@ -145,16 +168,28 @@ class CreateOrder(graphene.Mutation):
                     order_date=input.order_date or datetime.now()
                 )
                 order.products.set(products)
-                order.save()  # Triggers total_amount calculation
+                order.save()
                 return CreateOrder(order=order) # type: ignore
         except Exception as e:
             raise Exception(f"Error creating order: {str(e)}")
 
 class Query(graphene.ObjectType):
     hello = graphene.String()
-
+    all_customers = DjangoFilterConnectionField(CustomerType, filterset_class=CustomerFilter)
+    all_products = DjangoFilterConnectionField(ProductType, filterset_class=ProductFilter)
+    all_orders = DjangoFilterConnectionField(OrderType, filterset_class=OrderFilter)
+    
     def resolve_hello(self, info):
         return "Hello, GraphQL!"
+    
+    def resolve_all_customers(self, info, **kwargs):
+        return CustomerFilter(kwargs).qs
+    
+    def resolve_all_products(self, info, **kwargs):
+        return ProductFilter(kwargs).qs
+    
+    def resolve_all_orders(self, info, **kwargs):
+        return OrderFilter(kwargs).qs
 
 class Mutation(graphene.ObjectType):
     create_customer = CreateCustomer.Field()
@@ -163,4 +198,5 @@ class Mutation(graphene.ObjectType):
     create_order = CreateOrder.Field()
 
 schema = graphene.Schema(mutation=Mutation)
+
 
