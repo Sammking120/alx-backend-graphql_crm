@@ -32,14 +32,14 @@ class UpdateLowStockProducts(graphene.Mutation):
             updated_products.append(product)
         
         return UpdateLowStockProducts(
-            success_message=f"Updated {len(updated_products)} low-stock products",
-            updated_products=updated_products
+            success_message=f"Updated {len(updated_products)} low-stock products", # type: ignore
+            updated_products=updated_products # type: ignore
         )
 
-class Mutation(graphene.ObjectType):
-    update_low_stock_products = UpdateLowStockProducts.Field()
+# class Mutation(graphene.ObjectType):
+#     update_low_stock_products = UpdateLowStockProducts.Field()
 
-schema = graphene.Schema(mutation=Mutation)
+# schema = graphene.Schema(mutation=Mutation)
 
 class CustomerType(DjangoObjectType):
     class Meta:
