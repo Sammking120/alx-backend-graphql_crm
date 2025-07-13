@@ -11,5 +11,5 @@ INSTALLED_APPS = [
 
 CRONJOBS = [
     ('*/5 * * * *', 'crm.cron.log_crm_heartbeat'),
-    ('0 23 * * *', 'crm.cron.log_form_submissions'),  # Run daily at 11:00 PM
+    ('0 */12 * * *', 'crm.cron.update_low_stock'),  # Run every 12 hours at 00:00 and 12:00
 ]
